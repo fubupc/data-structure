@@ -112,8 +112,8 @@ func split(x uint64, bits uint8) (uint64, uint64) {
 	return x >> (bits / 2), x & (1<<(bits/2) - 1)
 }
 
-func concat(hi, lo uint64, bits uint8) uint64 {
-	return hi<<(bits/2) | lo
+func concat(c, i uint64, bits uint8) uint64 {
+	return c<<(bits/2) | i
 }
 
 func debugNode(n *node) string {

@@ -32,8 +32,11 @@ func TestSplitConcat(t *testing.T) {
 
 	for _, s := range scenarios {
 		c, i := split(s.x, s.bits)
-		assert.Equal(t, s.c, c, "input: x=%d bits=%d, result: c=%d i=%d", s.x, s.bits, c, i)
-		assert.Equal(t, s.i, i, "input: x=%d bits=%d, result: c=%d i=%d", s.x, s.bits, c, i)
+		assert.Equal(t, s.c, c, "split input: x=%d bits=%d, result: c=%d i=%d", s.x, s.bits, c, i)
+		assert.Equal(t, s.i, i, "split input: x=%d bits=%d, result: c=%d i=%d", s.x, s.bits, c, i)
+
+		x := concat(s.c, s.i, s.bits)
+		assert.Equal(t, s.x, x, "concat input: c=%d i=%d bits=%d, result: x=%d", s.c, s.i, s.bits, x)
 	}
 }
 
