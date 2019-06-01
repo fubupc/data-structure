@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// reference: https://www.mi.fu-berlin.de/inf/groups/ag-ti/theses/download/Ehrhardt15.pdf
+
 type Tree struct {
 	root  *node
 	count int
@@ -23,6 +25,10 @@ func (t *Tree) Insert(x uint64) {
 
 func (t *Tree) Successor(x uint64) (uint64, bool) {
 	return successor(t.root, x, 64)
+}
+
+func (t *Tree) Delete(x uint64) {
+	t.root = delete2(t.root, x, 64)
 }
 
 type node struct {
@@ -105,6 +111,62 @@ func insert(n *node, x uint64, bits uint8) *node {
 		n.summary = insert(n.summary, c, bits/2)
 	}
 	n.clusters[c] = insert(cluster, i, bits/2)
+	return n
+}
+
+func delete2(n *node, x uint64, bits uint8) *node {
+	if n == nil {
+		return nil
+	}
+	if x < n.min || x > n.max {
+		return n
+	}
+
+	// element count = 1
+	if n.min == n.max {
+		if n.min == x {
+			return nil
+		}
+		return n
+	}
+
+	// element count = 2
+	if n.summary == nil {
+		if n.min == x {
+			n.min = n.max
+		}
+		if n.max == x {
+			n.max = n.min
+		}
+		return n
+	}
+
+	// element count > 2
+	c, i := split(x, bits)
+
+	if n.min == x {
+		c = n.summary.min
+		i = n.clusters[c].min  // cluster c must exist
+		x = concat(c, i, bits) // new x to delete from clusters
+		n.min = x
+	}
+
+	if n.max == x {
+		c = n.summary.max
+		i = n.clusters[c].max  // cluster c must exist
+		x = concat(c, i, bits) // new x to delete from clusters
+		n.max = x
+	}
+
+	cluster := n.clusters[c]
+	if cluster == nil {
+		return n
+	}
+	if after := delete2(cluster, i, bits/2); after == nil {
+		delete(n.clusters, c)
+		n.summary = delete2(n.summary, c, bits/2)
+	}
+	//n.clusters[c] = after // unnecessary
 	return n
 }
 

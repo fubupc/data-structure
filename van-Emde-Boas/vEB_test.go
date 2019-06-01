@@ -74,3 +74,22 @@ func TestTree_Successor(t *testing.T) {
 		assert.False(t, found)
 	}
 }
+
+func TestTree_Delete(t *testing.T) {
+	tree := NewTree()
+
+	for x := uint64(0); x < 10000; x++ {
+		tree.Insert(x)
+	}
+
+	for x := uint64(0); x < 9999; x++ {
+		tree.Delete(x)
+
+		s, found := tree.Successor(x)
+		assert.True(t, found)
+		assert.Equal(t, x+1, s)
+
+		assert.True(t, tree.Find(x+1))
+	}
+	assert.True(t, tree.Find(9999))
+}
