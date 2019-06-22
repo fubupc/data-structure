@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func genTestKVs(n int) ([]Key, []Value) {
+func genTestKVs(n int, max int64) ([]Key, []Value) {
 	keys := []Key{}
 	vals := []Value{}
 	keyMap := make(map[Key]bool)
 
 	for len(keys) < n {
-		k := Key(rand.Uint64())
+		k := Key(rand.Int63n(max))
 		if !keyMap[k] {
 			keyMap[k] = true
 			keys = append(keys, k)
@@ -54,32 +54,46 @@ func makePtrStdMap(keys []Key, vals []Value) map[*Key]*Value {
 //	return t
 //}
 
-var testKeys, testVals = genTestKVs(100000)
+var testKeys, testVals = genTestKVs(1e5, 1e7)
 var testHAMT = makeHAMT(testKeys, testVals)
 var testStdMap = makeStdMap(testKeys, testVals)
 var testPtrStdMap = makePtrStdMap(testKeys, testVals)
 
 //var testART = makeART(testKeys, testVals)
 
-// Test#1:
-//BenchmarkHAMT_Add-8         	     100	  18062655 ns/op
-//BenchmarkART_Add-8          	       5	 262592804 ns/op
-//BenchmarkStdMap_Add-8       	     100	  10237082 ns/op
-//BenchmarkPtrStdMap_Add-8    	     100	  11453917 ns/op
-//BenchmarkHAMT_Find-8        	     500	   2909724 ns/op
-//BenchmarkART_Find-8         	     100	  13153139 ns/op
-//BenchmarkStdMap_Find-8      	     500	   3192401 ns/op
-//BenchmarkPtrStdMap_Find-8   	     500	   3273871 ns/op
+// ===== Symbol bit width = 5 =====
+// test#1:
+//BenchmarkHAMT_Add-8         	     100	  15255057 ns/op
+//BenchmarkStdMap_Add-8       	     200	   9137427 ns/op
+//BenchmarkPtrStdMap_Add-8    	     100	  10903658 ns/op
+//BenchmarkHAMT_Find-8        	     500	   2880576 ns/op
+//BenchmarkStdMap_Find-8      	     500	   3179046 ns/op
+//BenchmarkPtrStdMap_Find-8   	     500	   3208222 ns/op
+//
+// test#2:
+//BenchmarkHAMT_Add-8         	     100	  15367111 ns/op
+//BenchmarkStdMap_Add-8       	     200	   9196946 ns/op
+//BenchmarkPtrStdMap_Add-8    	     100	  10683513 ns/op
+//BenchmarkHAMT_Find-8        	     500	   2857944 ns/op
+//BenchmarkStdMap_Find-8      	     500	   3192465 ns/op
+//BenchmarkPtrStdMap_Find-8   	     500	   3143876 ns/op
 
-// Test#2:
-//BenchmarkHAMT_Add-8         	     100	  18130498 ns/op
-//BenchmarkART_Add-8          	       5	 265791594 ns/op
-//BenchmarkStdMap_Add-8       	     100	  10044649 ns/op
-//BenchmarkPtrStdMap_Add-8    	     100	  11448546 ns/op
-//BenchmarkHAMT_Find-8        	     500	   2813681 ns/op
-//BenchmarkART_Find-8         	     100	  13021862 ns/op
-//BenchmarkStdMap_Find-8      	     500	   3125170 ns/op
-//BenchmarkPtrStdMap_Find-8   	     500	   3108714 ns/op
+// ===== Symbol bit width = 6 =====
+// test#1:
+//BenchmarkHAMT_Add-8         	     100	  16304648 ns/op
+//BenchmarkStdMap_Add-8       	     200	   9007895 ns/op
+//BenchmarkPtrStdMap_Add-8    	     100	  10504392 ns/op
+//BenchmarkHAMT_Find-8        	     500	   2629162 ns/op
+//BenchmarkStdMap_Find-8      	     500	   3313128 ns/op
+//BenchmarkPtrStdMap_Find-8   	     500	   3302081 ns/op
+//
+// test#2:
+//BenchmarkHAMT_Add-8         	     100	  16408295 ns/op
+//BenchmarkStdMap_Add-8       	     200	   9050502 ns/op
+//BenchmarkPtrStdMap_Add-8    	     100	  10587110 ns/op
+//BenchmarkHAMT_Find-8        	     500	   2601488 ns/op
+//BenchmarkStdMap_Find-8      	     500	   3191200 ns/op
+//BenchmarkPtrStdMap_Find-8   	     500	   3201509 ns/op
 
 func BenchmarkHAMT_Add(b *testing.B) {
 	for i := 0; i < b.N; i++ {

@@ -366,76 +366,11 @@ func newAllocator() *allocator {
 	return &allocator{}
 }
 
+// TODO: use freelist to manually manage memory
 func (alloc *allocator) alloc(size int) baseptr {
-	var head *entry
-	switch size {
-	case 1:
-		head = &new([1]entry)[0]
-	case 2:
-		head = &new([2]entry)[0]
-	case 3:
-		head = &new([3]entry)[0]
-	case 4:
-		head = &new([4]entry)[0]
-	case 5:
-		head = &new([5]entry)[0]
-	case 6:
-		head = &new([6]entry)[0]
-	case 7:
-		head = &new([7]entry)[0]
-	case 8:
-		head = &new([8]entry)[0]
-	case 9:
-		head = &new([9]entry)[0]
-	case 10:
-		head = &new([10]entry)[0]
-	case 11:
-		head = &new([11]entry)[0]
-	case 12:
-		head = &new([12]entry)[0]
-	case 13:
-		head = &new([13]entry)[0]
-	case 14:
-		head = &new([14]entry)[0]
-	case 15:
-		head = &new([15]entry)[0]
-	case 16:
-		head = &new([16]entry)[0]
-	case 17:
-		head = &new([17]entry)[0]
-	case 18:
-		head = &new([18]entry)[0]
-	case 19:
-		head = &new([19]entry)[0]
-	case 20:
-		head = &new([20]entry)[0]
-	case 21:
-		head = &new([21]entry)[0]
-	case 22:
-		head = &new([22]entry)[0]
-	case 23:
-		head = &new([23]entry)[0]
-	case 24:
-		head = &new([24]entry)[0]
-	case 25:
-		head = &new([25]entry)[0]
-	case 26:
-		head = &new([26]entry)[0]
-	case 27:
-		head = &new([27]entry)[0]
-	case 28:
-		head = &new([28]entry)[0]
-	case 29:
-		head = &new([29]entry)[0]
-	case 30:
-		head = &new([30]entry)[0]
-	case 31:
-		head = &new([31]entry)[0]
-	case 32:
-		head = &new([32]entry)[0]
-	}
-	alloc.ptrs = append(alloc.ptrs, unsafe.Pointer(head))
-	return toBasePtr(head)
+	block := make([]entry, size)
+	alloc.ptrs = append(alloc.ptrs, unsafe.Pointer(&block[0]))
+	return toBasePtr(&block[0])
 }
 
 func (alloc *allocator) dealloc(bp baseptr) {
