@@ -464,7 +464,7 @@ func debugMap(m *Map) string {
 
 		if top.isLeaf() {
 			kv := top.asKVPair()
-			out += fmt.Sprintf(" <leaf: %d %d>", *kv.key, *kv.val)
+			out += fmt.Sprintf(" <leaf: %x %x>", *kv.key, *kv.val)
 		} else if depth*symbolWidth >= maxHashBits {
 			b := top.asKVBucket()
 			out += fmt.Sprintf(" <bucket: %d %p>", b.count, b.base.ptr())
