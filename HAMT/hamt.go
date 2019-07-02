@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/bits"
 	"unsafe"
+
+	"github.com/fubupc/data-structure/HAMT/qfmalloc"
 )
 
 const (
@@ -28,7 +30,8 @@ func (k Key) hash() uint64 {
 type Map struct {
 	count     int
 	root      *entry
-	allocator *allocator
+	allocator *qfmalloc.Allocator
+	//allocator *dummyAllocator
 }
 
 func NewMap() *Map {
@@ -78,10 +81,11 @@ func (m *Map) Find(k *Key) *Value {
 
 func (m *Map) Add(k *Key, v *Value) {
 	if m.root == nil {
-		m.allocator = newAllocator()
-		base := m.allocator.alloc(1)
+		m.allocator = qfmalloc.New(entrySize, int(cardinality))
+		//m.allocator = &dummyAllocator{}
+		base := toBasePtr(m.allocator.Alloc(1))
 		base.entryAt(0).asKVPair().set(k, v)
-		m.root = base.ptr()
+		m.root = base.entryAt(0)
 		m.count++
 		return
 	}
@@ -103,7 +107,6 @@ func (m *Map) Add(k *Key, v *Value) {
 			m.count++
 
 			oldHash := oldK.hash() >> shiftBits
-			//fmt.Printf("  * old key=%d hash=%x\n", *oldK, oldHash)
 			for {
 				if shiftBits >= maxHashBits {
 					m.to2KVBucket(curr, oldK, k, oldV, v)
@@ -112,8 +115,6 @@ func (m *Map) Add(k *Key, v *Value) {
 
 				newSymbol := hash & hashSymbolMask
 				oldSymbol := oldHash & hashSymbolMask
-
-				//fmt.Printf("  * new=[%d %x] old=[%d %x]\n", newSymbol, hash, oldSymbol, oldHash)
 
 				// no collision
 				if newSymbol != oldSymbol {
@@ -158,16 +159,15 @@ func (m *Map) Add(k *Key, v *Value) {
 }
 
 func (m *Map) extendAMTChain(n *amtNode, symbol uint64) *entry {
-	base := m.allocator.alloc(1)
+	base := toBasePtr(m.allocator.Alloc(1))
 	n.set(bitmap(0).set(symbol), base)
-	return base.ptr()
+	return base.entryAt(0)
 }
 
 func (m *Map) to2KVAMT(leaf *entry, symbol1, symbol2 uint64, k1, k2 *Key, v1, v2 *Value) {
-	base := m.allocator.alloc(2)
+	base := toBasePtr(m.allocator.Alloc(2))
 	amt := leaf.asAMTNode()
 	amt.set(bitmap(0).set(symbol1).set(symbol2), base)
-	//fmt.Printf("  * chain amt: base=%x k1=%d v1=%d k2=%d v2=%d child=%d\n", base, *k1, *v1, *k2, *v2, amt.childNum())
 	if symbol1 < symbol2 {
 		base.entryAt(0).asKVPair().set(k1, v1)
 		base.entryAt(1).asKVPair().set(k2, v2)
@@ -179,7 +179,7 @@ func (m *Map) to2KVAMT(leaf *entry, symbol1, symbol2 uint64, k1, k2 *Key, v1, v2
 
 // chainBucketWith2KV convert entry to a kvBucket and append new key/val to bucket
 func (m *Map) to2KVBucket(e *entry, k1, k2 *Key, v1, v2 *Value) {
-	base := m.allocator.alloc(2)
+	base := toBasePtr(m.allocator.Alloc(2))
 	base.entryAt(0).asKVPair().set(k1, v1)
 	base.entryAt(1).asKVPair().set(k2, v2)
 	e.asKVBucket().set(2, base)
@@ -188,23 +188,23 @@ func (m *Map) to2KVBucket(e *entry, k1, k2 *Key, v1, v2 *Value) {
 // bucketAppendKV reallocate bigger bucket to make room for new key/val
 func (m *Map) bucketAppendKV(b *kvBucket, k *Key, v *Value) {
 	oldBase := b.base
-	newBase := m.allocator.alloc(int(b.count + 1))
+	newBase := toBasePtr(m.allocator.Alloc(int(b.count + 1)))
 	copyEntryList(newBase, oldBase, 0, 0, int(b.count))
 	newBase.entryAt(int(b.count)).asKVPair().set(k, v)
 	b.set(b.count+1, newBase)
-	m.allocator.dealloc(oldBase)
+	m.allocator.Free(oldBase.ptr())
 }
 
 // amtAddKV reallocate bigger sub-trie to make room for new k/v pair
 func (m *Map) amtAddKV(n *amtNode, symbol uint64, index int, k *Key, v *Value) {
 	oldBase := n.base
 	newChildNum := n.childNum() + 1
-	newBase := m.allocator.alloc(newChildNum)
+	newBase := toBasePtr(m.allocator.Alloc(newChildNum))
 	copyEntryList(newBase, oldBase, 0, 0, index)
 	newBase.entryAt(index).asKVPair().set(k, v)
 	copyEntryList(newBase, oldBase, index+1, index, newChildNum-index-1)
 	n.set(n.bitmap.set(symbol), newBase)
-	m.allocator.dealloc(oldBase)
+	m.allocator.Free(oldBase.ptr())
 }
 
 func copyEntryList(dstBase, srcBase baseptr, dstStartIdx, srcStartIdx int, count int) {
@@ -237,19 +237,18 @@ func isBasePtr(x uint64) bool {
 	return x&basePtrMask != 0
 }
 
-func toBasePtr(e *entry) baseptr {
-	return baseptr(uintptr(unsafe.Pointer(e)) | basePtrMask)
+func toBasePtr(p unsafe.Pointer) baseptr {
+	return baseptr(uintptr(p) | basePtrMask)
 }
 
 // entryAt get entry address at specified index of list
-// PS: entryAt(0) = ptr()
 func (bp baseptr) entryAt(index int) *entry {
 	return (*entry)(unsafe.Pointer(uintptr(bp^basePtrMask) + entrySize*uintptr(index)))
 }
 
 // ptr get real address of entry list
-func (bp baseptr) ptr() *entry {
-	return (*entry)(unsafe.Pointer(bp ^ basePtrMask))
+func (bp baseptr) ptr() unsafe.Pointer {
+	return unsafe.Pointer(bp ^ basePtrMask)
 }
 
 // amtNode Array-Mapped-Trie node.
@@ -358,24 +357,6 @@ func (b *kvBucket) find(k *Key) *kvPair {
 	return nil
 }
 
-type allocator struct {
-	ptrs []unsafe.Pointer
-}
-
-func newAllocator() *allocator {
-	return &allocator{}
-}
-
-// TODO: use freelist to manually manage memory
-func (alloc *allocator) alloc(size int) baseptr {
-	block := make([]entry, size)
-	alloc.ptrs = append(alloc.ptrs, unsafe.Pointer(&block[0]))
-	return toBasePtr(&block[0])
-}
-
-func (alloc *allocator) dealloc(bp baseptr) {
-}
-
 type debugItem struct {
 	e     *entry
 	depth int
@@ -399,17 +380,17 @@ func debugMap(m *Map) string {
 
 		if top.isLeaf() {
 			kv := top.asKVPair()
-			out += fmt.Sprintf(" <leaf: %x %x>", *kv.key, *kv.val)
+			out += fmt.Sprintf(" <leaf(%p):%p|%p>", kv, kv.key, kv.val)
 		} else if depth*symbolWidth >= maxHashBits {
 			b := top.asKVBucket()
-			out += fmt.Sprintf(" <bucket: %d %p>", b.count, b.base.ptr())
+			out += fmt.Sprintf(" <bucket(%p):%d|%p>", b, b.count, b.base.ptr())
 			for i := 0; i < int(b.count); i++ {
 				child := b.base.entryAt(i)
 				queue = append(queue, debugItem{e: child, depth: depth + 1})
 			}
 		} else {
 			n := top.asAMTNode()
-			out += fmt.Sprintf(" <amt: %d %p>", n.childNum(), n.base.ptr())
+			out += fmt.Sprintf(" <amt(%p):%d|%p>", n, n.childNum(), n.base.ptr())
 			for i := 0; i < n.childNum(); i++ {
 				child := n.base.entryAt(i)
 				queue = append(queue, debugItem{e: child, depth: depth + 1})

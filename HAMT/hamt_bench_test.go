@@ -3,6 +3,8 @@ package hamt
 import (
 	"math/rand"
 	"testing"
+
+	gart "github.com/plar/go-adaptive-radix-tree"
 )
 
 func genTestKVs(n int, max int64) ([]Key, []Value) {
@@ -46,20 +48,52 @@ func makePtrStdMap(keys []Key, vals []Value) map[*Key]*Value {
 	return m
 }
 
-//func makeART(keys []Key, vals []Value) art.ART {
-//	t := art.MakeART()
-//	for i := 0; i < len(keys); i++ {
-//		t = t.Insert(art.Int64Key(int64(keys[i])), unsafe.Pointer(&vals[i]))
-//	}
-//	return t
-//}
-
 var testKeys, testVals = genTestKVs(1e5, 1e7)
 var testHAMT = makeHAMT(testKeys, testVals)
 var testStdMap = makeStdMap(testKeys, testVals)
 var testPtrStdMap = makePtrStdMap(testKeys, testVals)
 
-//var testART = makeART(testKeys, testVals)
+func gartKey(k int64) []byte {
+	b := make([]byte, 8)
+	for i := uint(0); i < 8; i++ {
+		b[i] = byte(k >> (8 * i) & 0xFF)
+	}
+	return b
+}
+func toGARTKey(keys []Key) []gart.Key {
+	gk := make([]gart.Key, 0, 64)
+	for _, key := range keys {
+		gk = append(gk, gartKey(int64(key)))
+	}
+	return gk
+}
+func makeGART(keys []gart.Key, vals []Value) gart.Tree {
+	t := gart.New()
+	for i := 0; i < len(keys); i++ {
+		t.Insert(keys[i], vals[i])
+	}
+	return t
+}
+
+var gartKeys = toGARTKey(testKeys)
+var testGART = makeGART(gartKeys, testVals)
+
+//func toARTKey(keys []Key) []art.Key {
+//	ak := make([]art.Key, 0, len(keys))
+//	for _, key := range keys {
+//		ak = append(ak, art.Int64Key(int64(key)))
+//	}
+//	return ak
+//}
+//func makeART(keys []art.Key, vals []Value) art.ART {
+//	t := art.MakeART()
+//	for i := 0; i < len(keys); i++ {
+//		t = t.Insert(keys[i], unsafe.Pointer(&vals[i]))
+//	}
+//	return t
+//}
+//var artKeys = toARTKey(testKeys)
+//var testART = makeART(artKeys, testVals)
 
 // ===== Symbol bit width = 5 =====
 // test#1:
@@ -103,9 +137,15 @@ func BenchmarkHAMT_Add(b *testing.B) {
 
 //func BenchmarkART_Add(b *testing.B) {
 //	for i := 0; i < b.N; i++ {
-//		_ = makeART(testKeys, testVals)
+//		_ = makeART(artKeys, testVals)
 //	}
 //}
+
+func BenchmarkGART_Add(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		_ = makeGART(gartKeys, testVals)
+	}
+}
 
 func BenchmarkStdMap_Add(b *testing.B) {
 	for i := 0; i < b.N; i++ {
@@ -129,11 +169,19 @@ func BenchmarkHAMT_Find(b *testing.B) {
 
 //func BenchmarkART_Find(b *testing.B) {
 //	for i := 0; i < b.N; i++ {
-//		for k := 0; k < len(testKeys); k++ {
-//			_ = testART.Search(art.Int64Key(int64(testKeys[k])))
+//		for k := 0; k < len(artKeys); k++ {
+//			_ = testART.Search(artKeys[k])
 //		}
 //	}
 //}
+
+func BenchmarkGART_Find(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for k := 0; k < len(gartKeys); k++ {
+			_, _ = testGART.Search(gartKeys[k])
+		}
+	}
+}
 
 func BenchmarkStdMap_Find(b *testing.B) {
 	for i := 0; i < b.N; i++ {
